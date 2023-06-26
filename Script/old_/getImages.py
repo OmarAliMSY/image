@@ -1,12 +1,16 @@
 import cv2
 import  glob
 import re
-cap = cv2.VideoCapture(0)
+
+cap = cv2.VideoCapture("http://[2a00:20:6040:4c8e::d1]:8080/video")
 
 #cap = cv2.VideoCapture("http://[2a00:20:6055:ca72::53]:8080/video")
 images = glob.glob('images/*.png')
 
-num = int(re.findall(pattern=r"\d+",string=images[-1].strip(".png"))[0]) +1
+if len(images) >0:
+    num = int(re.findall(pattern=r"\d+",string=images[-1].strip(".png"))[0]) +1
+else:
+    num = 0
 
 
 while cap.isOpened():
