@@ -3,6 +3,8 @@ import cv2.aruco as aruco
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import pandas as pd
+from scipy.signal import find_peaks
 
 
 class Marker:
@@ -36,7 +38,7 @@ class Marker:
 
     """
 
-    def __init__(self, video_source):
+    def __init__(self,video_source, aruco_dict=aruco.DICT_7X7_250):
         self.perim_dict = {}
         self.x_coords = {i: [] for i in range(1, 213)}
         self.y_coords = {i: [] for i in range(1, 213)}
@@ -51,7 +53,7 @@ class Marker:
         self.corners = None
         self.marker_perimeter = 108
         self.ids = None
-        self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
+        self.aruco_dict = aruco.getPredefinedDictionary(aruco_dict)
         self.parameters = aruco.DetectorParameters()
         self.marker_length = 27
         self.camera_mat = np.load(r'C:\Users\o.abdulmalik\PycharmProjects\image\Script\calibration_parameters\camera_matrix.npy')
@@ -128,23 +130,23 @@ class Marker:
             center = (center_x, center_y)
             cv2.circle(self.frame, center, 5, (0, 255, 0), -1)
             self.perim_dict[self.ids[i][0]] = float(cv2.arcLength(self.corners[i], True))
+        if self.ids is not None:
+            if index1 in self.ids and index2 in self.ids:
+                index_10 = list(self.ids).index(index1)
+                index_11 = list(self.ids).index(index2)
+                center_10 = (int((self.corners[index_10][0][0][0] + self.corners[index_10][0][2][0]) / 2),
+                             int((self.corners[index_10][0][0][1] + self.corners[index_10][0][2][1]) / 2))
+                center_11 = (int((self.corners[index_11][0][0][0] + self.corners[index_11][0][2][0]) / 2),
+                             int((self.corners[index_11][0][0][1] + self.corners[index_11][0][2][1]) / 2))
+                cv2.line(self.frame, center_10, center_11, (0, 0, 255), 2)
 
-        if index1 in self.ids and index2 in self.ids:
-            index_10 = list(self.ids).index(index1)
-            index_11 = list(self.ids).index(index2)
-            center_10 = (int((self.corners[index_10][0][0][0] + self.corners[index_10][0][2][0]) / 2),
-                         int((self.corners[index_10][0][0][1] + self.corners[index_10][0][2][1]) / 2))
-            center_11 = (int((self.corners[index_11][0][0][0] + self.corners[index_11][0][2][0]) / 2),
-                         int((self.corners[index_11][0][0][1] + self.corners[index_11][0][2][1]) / 2))
-            cv2.line(self.frame, center_10, center_11, (0, 0, 255), 2)
-
-            length = (((center_11[0] - center_10[0]) ** 2 + (center_11[1] - center_10[1]) ** 2) ** 0.5)
-            scale = (self.perim_dict[index1] + self.perim_dict[index2]) // 2
-            length = self.scale_length(length=length, measured_perimeter=scale)
-            length_text = "L: {:.2f}".format(length)
-            cv2.putText(self.frame, length_text,
-                        ((center_10[0] + center_11[0]) // 2, (center_10[1] + center_11[1]) // 2 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                length = (((center_11[0] - center_10[0]) ** 2 + (center_11[1] - center_10[1]) ** 2) ** 0.5)
+                scale = (self.perim_dict[index1] + self.perim_dict[index2]) // 2
+                length = self.scale_length(length=length, measured_perimeter=scale)
+                length_text = "L: {:.2f}".format(length)
+                cv2.putText(self.frame, length_text,
+                            ((center_10[0] + center_11[0]) // 2, (center_10[1] + center_11[1]) // 2 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
     def calculate_pose(self):
         """
@@ -189,11 +191,15 @@ class Marker:
             if len(self.y_coords[key]) > 0 and np.mean(self.y_coords[key]) > 0:
                 x = (self.x_coords[key] / np.max(self.x_coords[key]))
                 x -= np.mean(x)
-                x *= 10
                 ax1.plot(self.timestamps[key], x, label=f"X:{key}")
                 ax2.plot(self.timestamps[key], self.y_coords[key], label=f"Y:{key}")
+                ax1.axhline(y=0)
                 ax3.plot(self.timestamps[key], self.pitch_dict[key], label=f"Pitch:{key}")
                 ax4.plot(self.timestamps[key], self.roll_dict[key], label=f"Roll:{key}")
+                #self.calculate_oscillation_frequency(self.y_coords[key])
+                a = np.array(self.x_coords[key])
+                t = np.array(self.timestamps[key])
+
 
         ax1.set_ylabel('Y-Coordinate')
         ax1.legend()
@@ -206,9 +212,49 @@ class Marker:
 
         ax4.set_ylabel('Roll')
         ax4.legend()
-
         plt.subplots_adjust(hspace=0.4)
+
         plt.show()
+
+
+
+    def save_to_csv(self):
+
+
+        for key in self.y_coords.keys():
+            if len(self.y_coords[key]) > 0 and np.mean(self.y_coords[key]) > 0:
+                x = (self.x_coords[key] / np.max(self.x_coords[key]))
+                x -= np.mean(x)
+                a = np.array(self.x_coords[key])
+                t = np.array(self.timestamps[key])
+                df = pd.DataFrame({"t": t, "y": a})
+                # Speichere das DataFrame als CSV-Datei
+                df.to_csv("test_y_coords" + str(key) + ".csv", index=False)
+
+    def frequencies(self,time, coords):
+        t = time
+        y = np.array(coords)
+        y = y - np.mean(y)
+        y = y / np.max(y)
+        peaks, _ = find_peaks(y, height=0, distance=15)
+
+        indices = peaks[1:]
+        # Calculate the time differences between consecutive indices
+        timedeltas = []
+        for i in range(len(indices) - 1):
+            start_index = indices[i]
+            end_index = indices[i + 1]
+            time_difference = t[end_index] - t[start_index]
+            timedeltas.append(time_difference)
+
+        # Convert timedeltas to seconds
+        timedeltas = np.array(timedeltas).astype(np.float64)  # Convert to NumPy float64 array
+        timedeltas = timedeltas * 1e-9  # Convert nanoseconds to seconds
+
+        # Calculate the frequencies from the time differences
+        frequencies = 1 / np.mean(timedeltas)
+
+        return frequencies
 
     def run(self):
         """
@@ -219,29 +265,29 @@ class Marker:
         """
         fps = 0
         while True:
-            ret, self.frame = self.cap.read()
-            self.corners, self.ids, rejected = aruco.detectMarkers(self.frame, self.aruco_dict,
-                                                                    parameters=self.parameters)
+            try:
+                ret, self.frame = self.cap.read()
+                self.corners, self.ids, rejected = aruco.detectMarkers(self.frame, self.aruco_dict,
+                                                                        parameters=self.parameters)
 
-            self.fps_frame_counter += 1
-            if (time.time() - self.fps_start) > 1:
-                self.fpsl.append(self.fps_frame_counter / (time.time() - self.fps_start))
-                self.fps_start = time.time()
-                self.fps_frame_counter = 0
+                self.fps_frame_counter += 1
+                if (time.time() - self.fps_start) > 1:
+                    self.fpsl.append(self.fps_frame_counter / (time.time() - self.fps_start))
+                    self.fps_start = time.time()
+                    self.fps_frame_counter = 0
 
-            self.track_center_coordinates()
-            self.calculate_pose()
+                self.track_center_coordinates()
+                self.calculate_pose()
 
-            self.corner_dots()
-            self.connecting_line(3,4)
+                self.corner_dots()
+                self.connecting_line(3,4)
 
-            cv2.imshow('Frame', self.frame)
+                cv2.imshow('Frame', self.frame)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            except Exception as e:
+                print(e)
                 break
-
         self.cap.release()
         cv2.destroyAllWindows()
-
-        self.plot_data()
-
