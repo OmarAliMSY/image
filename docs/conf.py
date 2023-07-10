@@ -8,7 +8,7 @@
 import os
 import sys
 
-sys.path.insert(0,os.path.abspath(r"..\modules"))
+sys.path.insert(0, os.path.abspath(r"../modules"))
 
 
 project = 'Aruco-Tracking'

@@ -4,7 +4,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
 
-df = pd.read_csv("test_y_coords9.csv")
+df = pd.read_csv("_data/test_y_coords2.csv")
 print(df)
 print(df["t"])
 df['t'] = pd.to_datetime(df['t'], unit='s')

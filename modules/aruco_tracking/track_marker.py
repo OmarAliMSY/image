@@ -1,3 +1,4 @@
+import os
 import cv2
 import cv2.aruco as aruco
 import numpy as np
@@ -56,8 +57,8 @@ class Marker:
         self.aruco_dict = aruco.getPredefinedDictionary(aruco_dict)
         self.parameters = aruco.DetectorParameters()
         self.marker_length = 27
-        self.camera_mat = np.load(r'C:\Users\o.abdulmalik\PycharmProjects\image\Script\calibration_parameters\camera_matrix.npy')
-        self.dist_mat = np.load(r'C:\Users\o.abdulmalik\PycharmProjects\image\Script\calibration_parameters\dist.npy')
+        self.camera_mat = np.load(r'calibration_parameters/camera_matrix.npy')
+        self.dist_mat = np.load(r'calibration_parameters/dist.npy')
         self.cap = cv2.VideoCapture(video_source)
 
     def corner_dots(self):
@@ -218,7 +219,7 @@ class Marker:
 
 
 
-    def save_to_csv(self):
+    def save_to_csv(self,directory = os.getcwd()):
 
 
         for key in self.y_coords.keys():
@@ -229,7 +230,7 @@ class Marker:
                 t = np.array(self.timestamps[key])
                 df = pd.DataFrame({"t": t, "y": a})
                 # Speichere das DataFrame als CSV-Datei
-                df.to_csv("test_y_coords" + str(key) + ".csv", index=False)
+                df.to_csv(directory+"/test_y_coords" + str(key) + ".csv", index=False)
 
     def frequencies(self,time, coords):
         t = time
