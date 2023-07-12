@@ -21,6 +21,36 @@ class Frequency:
         self.t = None
         self.y = None
         self.indices = None
+        self.df = pd.read_csv(self.path)
+         
+        df = self.df
+        df['t'] = pd.to_datetime(df['t'], unit='s')
+
+        self.t = np.array(df["t"])
+        self.y = np.array(df["y"])
+        self.y = self.y - np.mean(self.y)
+        self.y = self.y / np.max(self.y)
+
+        
+
+
+        
+        self.time_step = df['t'].diff().mean().total_seconds()
+        print(self.time_step)
+
+    def mirrored_signal(self,n):
+        # Assuming self.y is your original signal
+        while n >0:
+            mirrored_signal = np.flip(self.y)
+
+            # Append the mirrored signal to the original signal
+            padded_signal = np.concatenate((self.y, mirrored_signal))
+
+            self.y = padded_signal
+            extended_t = np.concatenate((self.t, self.t + (self.t[-1] - self.t[0])))
+
+            self.t = extended_t
+            n-=1
 
     def calculate_frequency(self):
         """
@@ -34,13 +64,12 @@ class Frequency:
             - It performs peak detection and calculates the time differences between consecutive peaks.
             - The average time difference is used to calculate the frequency.
         """
-        df = pd.read_csv(self.path)
-        df['t'] = pd.to_datetime(df['t'], unit='s')
-        self.t = np.array(df["t"])
-        self.y = np.array((df["y"]))
+        self.df = pd.read_csv(self.path)
+        self.df['t'] = pd.to_datetime(self.df['t'], unit='s')
+        self.t = np.array(self.df["t"])
+        self.y = np.array((self.df["y"]))
         self.y = self.y - np.mean(self.y)
         self.y = self.y / np.max(self.y)
-
         peaks, _ = find_peaks(self.y, height=0, distance=15)
 
         condition = self.y[peaks] > 0.05
@@ -56,8 +85,30 @@ class Frequency:
 
         # Print the average time difference (frequency)
         average_frequency = np.mean(timedeltas)
-        print(average_frequency)
+        print(1/average_frequency)
         return average_frequency
+    
+    def calculate_fft(self):
+        self.mirrored_signal(3)
+        sp = np.fft.fft(np.sin(self.y))
+        freq = np.fft.fftfreq(self.y.shape[-1],self.time_step)
+        magnitude = np.abs(sp.real)
+        
+        # Apply peak detection
+        peaks, _ = find_peaks(magnitude, height=30)
+        sp.real = np.abs(sp.real)
+        plt.plot(np.abs(freq), np.abs(sp.real))
+
+        plt.plot(np.abs(freq[peaks]), np.abs(magnitude[peaks]), 'ro')
+        plt.xlim(0,2000)
+        plt.xlabel('Frequency')
+        plt.ylabel('Magnitude')
+        plt.xlim(0,5)
+        plt.show()
+
+
+
+
 
     def plot_oscillation(self):
         """
@@ -73,13 +124,38 @@ class Frequency:
             - The peaks are marked as 'x' symbols in the plot.
             - A horizontal line at y=0 is plotted for reference.
         """
+        self.mirrored_signal(3)
 
-        if self.t is None and self.y is None:
-            self.calculate_frequency()
+        peaks, _ = find_peaks(self.y, height=0, distance=1)
 
-        plt.plot(self.t[self.indices], self.y[self.indices], "x")  # Plot the peaks
-        plt.hlines(0, xmin=self.t[0], xmax=self.t[-1])  # Plot horizontal line at y=0
+        condition = self.y[peaks] > 0.05
+        self.indices = peaks[condition]
+
+        
+        #plt.plot(self.t[self.indices], self.y[self.indices], "x")  # Plot the peaks
+        #plt.hlines(0, xmin=self.t[0], xmax=self.t[-1])  # Plot horizontal line at y=0
         plt.plot(self.t, self.y)  # Plot the oscillation data
         plt.gcf().autofmt_xdate()
 
         plt.show()
+
+
+
+    def test_file(self):
+
+        # Define parameters
+        duration = 10.0  # Duration of the sine wave in seconds
+        sampling_rate = 100000  # Sampling rate in Hz
+        frequency = 820  # Frequency of the sine wave in Hz
+
+        # Generate time values
+        t = np.linspace(0, duration, int(duration * sampling_rate), endpoint=False)
+
+        # Generate the sine wave
+        y = np.sin(2 * np.pi * frequency * t)
+
+        # Create a DataFrame with time and amplitude columns
+        df = pd.DataFrame({'t': t, 'y': y})
+
+        # Save DataFrame to a CSV file
+        df.to_csv('test_data820hz.csv', index=False)
